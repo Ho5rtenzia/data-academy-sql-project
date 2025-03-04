@@ -1,1 +1,0 @@
-4. projekt SQL
