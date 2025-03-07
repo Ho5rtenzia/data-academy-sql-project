@@ -24,7 +24,7 @@ SELECT
 FROM salary_trend
 ORDER BY industry_name, payroll_date;
 
--- Kolik je možné si koupit litrů mléka a kilogramů chleba za první a poslední srovnatelné období v dostupných datech cen a mezd?
+-- 2. Kolik je možné si koupit litrů mléka a kilogramů chleba za první a poslední srovnatelné období v dostupných datech cen a mezd?
 WITH salary_price AS (
 	SELECT 
 	    category_name,
@@ -51,3 +51,36 @@ SELECT
 FROM salary_price
 WHERE first_rank = 1 OR last_rank = 1
 ORDER BY category_name, payroll_date;
+
+-- 3. Která kategorie potravin zdražuje nejpomaleji 
+-- (je u ní nejnižší percentuální meziroční nárůst)?
+WITH price_by_year AS (
+	SELECT 
+		YEAR(STR_TO_DATE(price_date_from, '%d.%m.%Y')) AS price_year,
+		category_name, 
+		ROUND(AVG(price), 2) AS avg_price
+	FROM t_eva_vallusova_project_sql_primary_final
+	GROUP BY category_name, price_year
+),
+price_change AS (
+	SELECT 
+		price_year,
+		category_name,
+		avg_price,
+		LAG(avg_price) OVER (PARTITION BY category_name ORDER BY price_year) AS previous_year_price
+	FROM price_by_year
+),
+percent_change_per_category AS (
+	SELECT 
+		category_name,
+		ROUND(AVG((avg_price-previous_year_price)/previous_year_price) * 100,2) AS avg_percent_change
+	FROM price_change
+	WHERE previous_year_price IS NOT NULL
+	GROUP BY category_name
+)
+SELECT 
+	category_name,
+	avg_percent_change
+FROM percent_change_per_category
+ORDER BY avg_percent_change ASC
+LIMIT 1;

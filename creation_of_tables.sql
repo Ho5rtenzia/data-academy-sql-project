@@ -22,3 +22,12 @@ CREATE TABLE IF NOT EXISTS t_eva_vallusova_project_SQL_primary_final AS
 	ORDER BY payroll_date DESC;
 
 -- Vytvoreni 2. tabulky
+CREATE TABLE IF NOT EXISTS t_eva_vallusova_project_SQL_secondary_final AS
+SELECT *
+FROM economies c
+WHERE country = 'European Union'
+	AND `year` BETWEEN 2009 AND 2018
+ORDER BY `year` DESC;
+
+SELECT *
+FROM t_eva_vallusova_project_SQL_secondary_final;
