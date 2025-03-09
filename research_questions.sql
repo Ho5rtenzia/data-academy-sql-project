@@ -73,14 +73,86 @@ price_change AS (
 percent_change_per_category AS (
 	SELECT 
 		category_name,
-		ROUND(AVG((avg_price-previous_year_price)/previous_year_price) * 100,2) AS avg_percent_change
+		ROUND(AVG((avg_price - previous_year_price) / previous_year_price) * 100, 2) AS avg_annual_percent_change
 	FROM price_change
 	WHERE previous_year_price IS NOT NULL
 	GROUP BY category_name
 )
 SELECT 
 	category_name,
-	avg_percent_change
+	ABS(avg_annual_percent_change) AS lowest_avg_annual_percent_change
 FROM percent_change_per_category
-ORDER BY avg_percent_change ASC
+ORDER BY lowest_avg_annual_percent_change
 LIMIT 1;
+
+-- 4. Existuje rok, ve kterém byl meziroční nárůst cen potravin výrazně vyšší než růst mezd 
+-- (větší než 10 %)?
+WITH price_by_year AS (
+	SELECT 
+		YEAR(STR_TO_DATE(price_date_from, '%d.%m.%Y')) AS year_of_measurement,
+		ROUND(AVG(price), 2) AS avg_price,
+		ROUND(AVG(salary), 2) AS avg_salary
+	FROM t_eva_vallusova_project_sql_primary_final
+	GROUP BY year_of_measurement
+),
+change_of_measurement AS (
+	SELECT 
+		year_of_measurement,
+		avg_price,
+		LAG(avg_price) OVER (ORDER BY year_of_measurement) AS previous_year_price,
+		avg_salary,
+		LAG(avg_salary) OVER (ORDER BY year_of_measurement) AS previous_year_salary
+	FROM price_by_year
+),
+percent_change_per_year AS (
+	SELECT 
+		year_of_measurement,
+		ROUND(((avg_price-previous_year_price)/previous_year_price) * 100,2) AS avg_price_percent_change,
+		ROUND(((avg_salary-previous_year_salary)/previous_year_salary) * 100,2) AS avg_salary_percent_change
+	FROM change_of_measurement
+	WHERE previous_year_price IS NOT NULL
+		AND previous_year_salary IS NOT NULL
+)
+SELECT 
+	year_of_measurement,
+	avg_price_percent_change,
+	avg_salary_percent_change,
+	avg_price_percent_change - avg_salary_percent_change AS difference
+FROM percent_change_per_year
+ORDER BY difference DESC;
+
+
+-- 5. Má výška HDP vliv na změny ve mzdách a cenách potravin? Neboli, pokud HDP vzroste výrazněji v jednom roce, 
+-- projeví se to na cenách potravin či mzdách ve stejném nebo násdujícím roce výraznějším růstem?
+WITH yearly_data AS(
+	SELECT 
+		tevp.payroll_date AS year_of_measurement,
+		ROUND(AVG(tevp.salary),2) AS avg_salary,
+		ROUND(AVG(tevp.price), 2) AS avg_price,
+		GDP
+	FROM t_eva_vallusova_project_sql_primary_final tevp
+	JOIN t_eva_vallusova_project_sql_secondary_final tevs
+		ON tevp.payroll_date = tevs.`year`
+	WHERE tevs.country = 'Czech Republic'
+	GROUP BY tevp.payroll_date
+),
+lagged_data AS (
+	SELECT 
+		year_of_measurement,
+		avg_salary,
+		avg_price,
+		GDP,
+		LAG(avg_salary) OVER (ORDER BY year_of_measurement) AS prev_salary,
+		LAG(avg_price) OVER (ORDER BY year_of_measurement) AS prev_price,
+		LAG(GDP) OVER (ORDER BY year_of_measurement) AS prev_gdp
+	FROM yearly_data
+)
+SELECT 
+	year_of_measurement,
+	avg_salary,
+	avg_price,
+	GDP,
+	ROUND(((avg_salary-prev_salary)/prev_salary) * 100,2) AS salary_growth,
+	ROUND(((avg_price-prev_price)/prev_price) * 100,2) AS price_growth,
+	ROUND(((GDP-prev_gdp)/prev_gdp) * 100,2) AS gdp_growth
+FROM lagged_data;

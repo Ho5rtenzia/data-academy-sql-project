@@ -23,11 +23,17 @@ CREATE TABLE IF NOT EXISTS t_eva_vallusova_project_SQL_primary_final AS
 
 -- Vytvoreni 2. tabulky
 CREATE TABLE IF NOT EXISTS t_eva_vallusova_project_SQL_secondary_final AS
-SELECT *
-FROM economies c
-WHERE country = 'European Union'
-	AND `year` BETWEEN 2009 AND 2018
-ORDER BY `year` DESC;
+SELECT 
+	e.country,
+	e.`year`,
+	e.GDP,
+	e.population,
+	e.gini
+FROM economies e
+JOIN countries c 
+	ON 	e.country = c.country 
+WHERE c.continent = 'Europe'
+	AND e.`year` BETWEEN 2009 AND 2018
+ORDER BY e.`year` DESC;
 
-SELECT *
-FROM t_eva_vallusova_project_SQL_secondary_final;
+
